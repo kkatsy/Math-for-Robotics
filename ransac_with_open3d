@@ -1,0 +1,68 @@
+import open3d as o3d
+import io
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
+
+### Get optimal plane
+def getBestPlane():
+    plane_model, inliers = downpcd.segment_plane(distance_threshold=0.05,
+                                                 ransac_n=3,
+                                                 num_iterations=1000000000)
+
+    [a, b, c, d] = plane_model
+    print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+
+    inlier_cloud = pcd.select_by_index(inliers)
+    inlier_cloud.paint_uniform_color([1.0, 0, 0])
+    outlier_cloud = pcd.select_by_index(inliers, invert=True)
+    o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
+
+def getNPlanes(n, point_cloud):
+    pointCloudList = []
+    colorList = []
+    for i in range(n):
+
+        plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.05,
+                                             ransac_n=3,
+                                             num_iterations=1000000000)
+
+        [a, b, c, d] = plane_model
+        print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+
+        inlier_cloud = point_cloud.select_by_index(inliers)
+
+
+        outlier_cloud = point_cloud.select_by_index(inliers, invert=True)
+        randColor = list([random.random(),random.random() ,random.random()])
+        inlier_cloud.paint_uniform_color(randColor)
+        pointCloudList.append(inlier_cloud)
+        point_cloud = outlier_cloud
+
+    o3d.visualization.draw_geometries(pointCloudList)
+
+    outlier_points = np.asarray(outlier_cloud.points)
+    print("Number of points not includedi in planes: ", outlier_points.shape[0])
+
+
+#######################################################################################################################
+
+### Load in point cloud data
+points = np.loadtxt("CSE.asc")
+pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(points)
+# o3d.visualization.draw_geometries([pcd])
+
+### Uniformly downsample point cloud
+downpcd = pcd.voxel_down_sample(voxel_size=0.05)
+
+point_cloud_points = np.asarray(downpcd.points)
+print("Number of points in original point cloud: ", point_cloud_points.shape[0])
+
+getNPlanes(2, downpcd)
+getNPlanes(3, downpcd)
+getNPlanes(4, downpcd)
+getNPlanes(5, downpcd)
+getNPlanes(6, downpcd)
+
