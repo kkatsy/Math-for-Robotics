@@ -1,0 +1,86 @@
+import pandas as pd
+# from pyntcloud import PyntCloud
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+import math
+from itertools import combinations
+from mpl_toolkits import mplot3d
+from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+
+# read in data into df
+point_dict = {'x': [], 'y': [], 'z': []}
+f = open('Empty2.asc', 'r')
+lines = f.readlines()
+for line in lines:
+    line = line.rstrip()
+    x, y, z = line.split()
+    point_dict['x'].append(float(x))
+    point_dict['y'].append(float(y))
+    point_dict['z'].append(float(z))
+point_df = pd.DataFrame(point_dict)
+
+# visualize point cloud - matplotlib
+fig = plt.figure()
+ax = plt.axes(projection ='3d')
+ax.scatter(point_df['x'], point_df['y'], point_df['z'], 'green', s=2)
+# plt.show()
+
+
+# RANSAC algo to find the one, optimal plane
+def ransac_optimal(iter, tau, point_array):
+    best_plane = {'a': None, 'b': None, 'c': None, 'd': None }
+    max_inlier_num = 0
+    inliers_index = []
+
+    for i in range(iter):
+        # get random sample
+        i_s = random.sample(range(len(point_array)), 3)
+        rand_three = point_array[i_s]
+        vector_one = rand_three[1] - rand_three[0]
+        vector_two = rand_three[2] - rand_three[0]
+
+        # find plane params
+        normal_vec = np.cross(vector_one, vector_two)
+        a, b, c = normal_vec / np.linalg.norm(normal_vec)
+        d = -1 * np.sum(normal_vec * rand_three[0])
+
+        # get absolute value of distances of all points to said plane
+        # vectorized for speed up
+        point_to_plane_dists = (a*point_array[:, 0] + b*point_array[:, 1] + c*point_array[:, 2] + d) / np.sqrt(a**2 + b**2 + c**2)
+        # point_to_plane_dists = np.absolute(point_to_plane_dists)
+
+        # find num of inliers that are leq to the threshold distance from plane
+        inliers_index = np.where(np.abs(point_to_plane_dists) <= tau)[0]
+        num_inliers = len(inliers_index)
+
+        # get best plane params
+        if num_inliers > max_inlier_num:
+            max_inlier_num = num_inliers
+            best_plane['a'], best_plane['b'], best_plane['c'], best_plane['d'] = a, b, c, d
+
+    return best_plane, max_inlier_num, inliers_index
+
+
+point_list = []
+for index, row in point_df.iterrows():
+    xyz = [row['x'], row['y'], row['z']]
+    if xyz != [0,0,0]:
+        point_list.append(xyz)
+
+points_sample = random.sample(point_list, int(len(point_list)/10))
+
+point_list = np.asarray(points_sample)
+
+best_plane, num_inliers, inliers_index = ransac_optimal(10000, 0.12, point_list)
+print(best_plane)
+inliers = point_list[inliers_index]
+mask = np.ones(len(point_list), dtype=bool)
+mask[inliers_index] = False
+outliers = point_list[mask]
+
+ax = plt.axes(projection='3d')
+ax.scatter(inliers[:,0], inliers[:,1], inliers[:,2], c = 'cornflowerblue', s=0.02)
+ax.scatter(outliers[:,0], outliers[:,1], outliers[:,2], c = 'salmon', s=0.02)
+plt.show()
